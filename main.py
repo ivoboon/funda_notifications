@@ -1,4 +1,4 @@
-import mysql.connector
+import sqlite3
 import os
 from dotenv import load_dotenv
 import requests
@@ -6,26 +6,43 @@ from bs4 import BeautifulSoup
 
 def connect_to_sql():
     """
-    Establishes a connection to a MySQL database using credentials from a .env file.
+    Establishes a connection to a SQLite3 database.
+    It creates one if it doesn't exist yet.
+    Also creates the table if it doesn't exist yet.
     Returns:
         tuple: A tuple (connection, cursor) if successful, otherwise (None, None).
     """
     try:
-        # Make database connection
-        connection = mysql.connector.connect(
-            host = os.getenv('host'),
-            user = os.getenv('user'),
-            passwd = os.getenv('passwd'),
-            database = os.getenv('database')
-        )
+        conn = sqlite3.connect('.db')
+        cursor = conn.cursor()
 
-        # Make cursor with which we can query
-        cursor = connection.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS LISTINGS (
+                URL TEXT PRIMARY KEY,
+                FLAG BOOLEAN NOT NULL
+            )
+        ''')
+        conn.commit()
 
-        return connection, cursor
+        print("Connection to database established")
+
+        return conn, cursor
+    
     except Exception as e:
-        print(f"An error occurred: {e}")
-        return None, None
+        print(f"An error occurred in connect_to_sql: {e}")
+        exit()
+
+def insert_records(conn, cursor, links):
+    """
+    @@@
+    """
+    try:
+        for link in links:
+            cursor.execute("INSERT INTO LISTINGS (URL, FLAG) VALUES (?, 0)", [link])
+        conn.commit()
+    except Exception as e:
+        print(f"An error occured in insert_records: {e}")
+        exit()
 
 def get_new_listings():
     """
@@ -54,18 +71,27 @@ def get_new_listings():
 
         # We find all the divs with class flex justify-between
         # Then we loop through all those divs to find the a tag with the href
+        # We add all the links to the links array
+        links = []
         divs = soup.find_all('div', class_='flex justify-between')
         for div in divs:
             link = div.find('a').get('href')
+            links.append(link)
             print(link)
+        return links
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An error occurred in get_new_listings: {e}")
+        exit()
 
 def main():
     load_dotenv()
 
-    get_new_listings()
+    links = get_new_listings()
+
+    conn, cursor = connect_to_sql()
+
+    insert_records(conn, cursor, links)
 
 if __name__ == "__main__":
     main()
