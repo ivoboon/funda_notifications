@@ -4,6 +4,51 @@ from dotenv import load_dotenv
 import requests
 from bs4 import BeautifulSoup
 
+def get_new_listings():
+    """
+    Extracts URLs from Funda based on given parameters
+
+    Returns:
+        links ([str]): URLs 
+    """
+    try:
+        # Retrieving scraper API key and setting up parameters for the HTML query
+        # Scraper API is used to prevent from being identified as a bot
+        api_key = os.getenv('scraper_api_key')
+        url = 'https://www.funda.nl/zoeken/koop?selected_area=%5B%22amstelveen,5km%22%5D&price=%22450000-675000%22&object_type=%5B%22apartment%22%5D&floor_area=%2280-%22&rooms=%224-%22&search_result=1'
+        country_code = 'eu'
+        device_type = 'desktop'
+        url_scraper = 'https://api.scraperapi.com/'
+
+        # Making a payload with our request variables
+        payload = {
+            'api_key': api_key,
+            'url': url,
+            'country_code': country_code,
+            device_type: device_type
+        }
+
+        # Executing our HTML request, and parsing it
+        response = requests.get(url_scraper, params=payload)
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # We find all the divs with class flex justify-between
+        # Then we loop through all those divs to find the a tag with the href
+        # We add all the links to the links array
+        links = []
+        divs = soup.find_all('div', class_='flex justify-between')
+        for div in divs:
+            link = div.find('a').get('href')
+            links.append(link)
+
+        print()
+
+        return links
+
+    except Exception as e:
+        print(f"An error occurred in get_new_listings: {e}")
+        exit()
+
 def connect_to_sql():
     """
     Establishes a connection to a SQLite3 database.
@@ -101,6 +146,7 @@ def insert_records_target(conn, cursor):
         conn.commit()
         print('Records moved from staging to target')
 
+        # Empty staging table
         cursor.execute('''
             DELETE FROM
                 LISTINGS_STAGING;
@@ -111,51 +157,6 @@ def insert_records_target(conn, cursor):
     except Exception as e:
         print(f"An error occurred in insert_records_target: {e}")
         exit()
-
-def get_new_listings():
-    """
-    Extracts URLs from Funda based on given parameters
-
-    Returns:
-        links ([str]): URLs 
-    """
-    try:
-        # Retrieving scraper API key and setting up parameters for the HTML query
-        # Scraper API is used to prevent from being identified as a bot
-        api_key = os.getenv('scraper_api_key')
-        url = 'https://www.funda.nl/zoeken/koop?selected_area=%5B%22amstelveen,5km%22%5D&price=%22450000-675000%22&object_type=%5B%22apartment%22%5D&floor_area=%2280-%22&rooms=%224-%22&search_result=1'
-        country_code = 'eu'
-        device_type = 'desktop'
-        url_scraper = 'https://api.scraperapi.com/'
-
-        # Making a payload with our request variables
-        payload = {
-            'api_key': api_key,
-            'url': url,
-            'country_code': country_code,
-            device_type: device_type
-        }
-
-        # Executing our HTML request, and parsing it
-        response = requests.get(url_scraper, params=payload)
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        # We find all the divs with class flex justify-between
-        # Then we loop through all those divs to find the a tag with the href
-        # We add all the links to the links array
-        links = []
-        divs = soup.find_all('div', class_='flex justify-between')
-        for div in divs:
-            link = div.find('a').get('href')
-            links.append(link)
-
-        print()
-
-        return links
-
-    except Exception as e:
-        print(f"An error occurred in get_new_listings: {e}")
-        exit() 
 
 def main():
     load_dotenv()
