@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import requests
 from bs4 import BeautifulSoup
 
-def get_new_listings():
+def get_listings():
     """
     Extracts URLs from Funda based on given parameters
 
@@ -46,7 +46,7 @@ def get_new_listings():
         return links
 
     except Exception as e:
-        print(f"An error occurred in get_new_listings: {e}")
+        print(f"An error occurred in get_listings: {e}")
         exit()
 
 def connect_to_sql():
@@ -158,10 +158,20 @@ def insert_records_target(conn, cursor):
         print(f"An error occurred in insert_records_target: {e}")
         exit()
 
+def get_new_listings(conn, cursor):
+    """
+    @@@
+    """
+    try:
+        pass
+    except Exception as e:
+        print(f"An error occurred in get_new_listings: {e}")
+        exit()
+
 def main():
     load_dotenv()
 
-    links = get_new_listings()
+    links = get_listings()
     conn, cursor = connect_to_sql()
     insert_records_staging(conn, cursor, links)
     insert_records_target(conn, cursor)
