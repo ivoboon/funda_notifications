@@ -8,19 +8,32 @@ def connect_to_sql():
     """
     Establishes a connection to a SQLite3 database.
     It creates one if it doesn't exist yet.
-    Also creates the table if it doesn't exist yet.
+    Also creates the staging and target tables if they don't exist yet.
+    
     Returns:
-        tuple: A tuple (connection, cursor) if successful, otherwise (None, None).
+        connection, cursor (tuple): connection, cursor
     """
     try:
+        # Makes our connection
         conn = sqlite3.connect('.db')
         cursor = conn.cursor()
 
+        # Makes target table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS LISTINGS (
                 URL TEXT PRIMARY KEY,
-                FLAG BOOLEAN NOT NULL
-            )
+                FLAG BOOLEAN NOT NULL,
+                INSERT_TIMESTAMP TEXT NOT NULL,
+                UPDATE_TIMESTAMP TEXT NOT NULL
+            );
+        ''')
+        conn.commit()
+
+        # Makes staging table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS LISTINGS_STAGING (
+                URL TEXT
+            );
         ''')
         conn.commit()
 
@@ -32,21 +45,79 @@ def connect_to_sql():
         print(f"An error occurred in connect_to_sql: {e}")
         exit()
 
-def insert_records(conn, cursor, links):
+def insert_records_staging(conn, cursor, links):
     """
-    @@@
+    Inserts records into the staging table
+
+    Args:
+        conn (sqlite3.Connection): connection
+        cursor (sqlite3.Cursor): cursor
+        links ([str]): links to be inserted
     """
     try:
+        # Loop through links and insert each link into staging table
         for link in links:
-            cursor.execute("INSERT INTO LISTINGS (URL, FLAG) VALUES (?, 0)", [link])
+            cursor.execute("INSERT INTO LISTINGS_STAGING (URL) VALUES (?);", [link])
         conn.commit()
+        print('Records inserted into staging table')
+
     except Exception as e:
         print(f"An error occured in insert_records: {e}")
         exit()
 
+def insert_records_target(conn, cursor):
+    """
+    Moves records from staging to target
+
+    Args:
+        conn (sqlite3.Connection): connection
+        cursor (sqlite3.Cursor): cursor
+    """
+    try:
+        # Merges records from staging to target
+        cursor.execute('''
+            INSERT INTO
+                LISTINGS (
+                    URL,
+                    FLAG,
+                    INSERT_TIMESTAMP,
+                    UPDATE_TIMESTAMP
+                )
+            SELECT
+                URL,
+                FALSE AS FLAG,
+                DATETIME() AS INSERT_TIMESTAMP,
+                DATETIME() AS UPDATE_TIMESTAMP
+            FROM
+                LISTINGS_STAGING
+            WHERE
+                URL NOT IN (
+                    SELECT
+                        URL
+                    FROM
+                        LISTINGS
+                );
+        ''')
+        conn.commit()
+        print('Records moved from staging to target')
+
+        cursor.execute('''
+            DELETE FROM
+                LISTINGS_STAGING;
+        ''')
+        conn.commit()
+        print('Records removed from staging table')
+
+    except Exception as e:
+        print(f"An error occurred in insert_records_target: {e}")
+        exit()
+
 def get_new_listings():
     """
-    @@@
+    Extracts URLs from Funda based on given parameters
+
+    Returns:
+        links ([str]): URLs 
     """
     try:
         # Retrieving scraper API key and setting up parameters for the HTML query
@@ -77,21 +148,22 @@ def get_new_listings():
         for div in divs:
             link = div.find('a').get('href')
             links.append(link)
-            print(link)
+
+        print()
+
         return links
 
     except Exception as e:
         print(f"An error occurred in get_new_listings: {e}")
-        exit()
+        exit() 
 
 def main():
     load_dotenv()
 
     links = get_new_listings()
-
     conn, cursor = connect_to_sql()
-
-    insert_records(conn, cursor, links)
+    insert_records_staging(conn, cursor, links)
+    insert_records_target(conn, cursor)
 
 if __name__ == "__main__":
     main()
