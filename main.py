@@ -160,10 +160,37 @@ def insert_records_target(conn, cursor):
 
 def get_new_listings(conn, cursor):
     """
-    @@@
+    Gets URLs that have not been flagged yet from the database
+
+    Args:
+        conn (sqlite3.Connection): connection
+        cursor (sqlite3.Cursor): cursor
+
+    Returns:
+        new_listings ([str]): new listings
     """
     try:
-        pass
+        # Get listings that have not been flagged yet
+        cursor.execute('''
+            SELECT
+                URL
+            FROM
+                LISTINGS
+            WHERE
+                FLAG = FALSE;
+        ''')
+
+        new_listings_tup = cursor.fetchall()
+
+        # Fetchall returns array with tuples, convert to just an array
+        new_listings = []
+        for new_listing in new_listings_tup:
+            new_listings.append(new_listing[0])
+
+        print('Retrieved new listings')
+
+        return new_listings
+
     except Exception as e:
         print(f"An error occurred in get_new_listings: {e}")
         exit()
@@ -175,6 +202,7 @@ def main():
     conn, cursor = connect_to_sql()
     insert_records_staging(conn, cursor, links)
     insert_records_target(conn, cursor)
+    new_listings = get_new_listings(conn, cursor)
 
 if __name__ == "__main__":
     main()
