@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 import requests
 from bs4 import BeautifulSoup
+import smtplib
 
 def get_listings():
     """
@@ -14,8 +15,9 @@ def get_listings():
     try:
         # Retrieving scraper API key and setting up parameters for the HTML query
         # Scraper API is used to prevent from being identified as a bot
+        # To do: make URL dynamic
         api_key = os.getenv('scraper_api_key')
-        url = 'https://www.funda.nl/zoeken/koop?selected_area=%5B%22amstelveen,5km%22%5D&price=%22450000-675000%22&object_type=%5B%22apartment%22%5D&floor_area=%2280-%22&rooms=%224-%22&search_result=1'
+        url = os.getenv('funda_url')
         country_code = 'eu'
         device_type = 'desktop'
         url_scraper = 'https://api.scraperapi.com/'
@@ -195,6 +197,39 @@ def get_new_listings(conn, cursor):
         print(f"An error occurred in get_new_listings: {e}")
         exit()
 
+def mail_new_listings(new_listings):
+    """
+    @@@
+    """
+    try:
+        # E-mail content
+        from_email = os.getenv('from_email_address')
+        to_email = os.getenv('to_email_address')
+        subject = "New Funda Listings"
+        body = "\n".join(new_listings)
+
+        # SMTP server configuration
+        smtp_server = os.getenv('from_email_smtp')
+        smtp_port = os.getenv('from_email_port')
+        smtp_password = os.getenv('from_email_password')
+
+        # Connect to SMTP server
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(from_email, smtp_password)
+
+        # Construct e-mail headers
+        message = f"From: {from_email}\nTo: {to_email}\nSubject: {subject}\n\n{body}"
+
+        # Send e-mail
+        server.sendmail(from_email, to_email, message)
+        server.quit()
+
+        print("E-mail sent succesfully")
+    except Exception as e:
+        print(f"An error occurred in mail_new_listings: {e}")
+        exit()
+
 def main():
     load_dotenv()
 
@@ -203,6 +238,10 @@ def main():
     insert_records_staging(conn, cursor, links)
     insert_records_target(conn, cursor)
     new_listings = get_new_listings(conn, cursor)
-
+    
+    if len(new_listings) > 0:
+        mail_new_listings(new_listings)
+    else:
+        print("No new listings to send")
 if __name__ == "__main__":
     main()
