@@ -15,7 +15,6 @@ def get_listings():
     try:
         # Retrieving scraper API key and setting up parameters for the HTML query
         # Scraper API is used to prevent from being identified as a bot
-        # To do: make URL dynamic
         api_key = os.getenv('scraper_api_key')
         url = os.getenv('funda_url')
         country_code = 'eu'
@@ -197,16 +196,21 @@ def get_new_listings(conn, cursor):
         print(f"An error occurred in get_new_listings: {e}")
         exit()
 
-def mail_new_listings(new_listings):
+def mail_new_listings(new_listings, conn, cursor):
     """
-    @@@
+    Gets the unflagged listings from the database, e-mails them, then flags all unflagged records in the database
+
+    Args:
+        new_listings ([str]): new listings
+        conn (sqlite3.Connection): connection
+        cursor (sqlite3.Cursor): cursor
     """
     try:
         # E-mail content
         from_email = os.getenv('from_email_address')
         to_email = os.getenv('to_email_address')
         subject = "New Funda Listings"
-        body = "\n".join(new_listings)
+        body = "\n\n".join(new_listings)
 
         # SMTP server configuration
         smtp_server = os.getenv('from_email_smtp')
@@ -226,6 +230,20 @@ def mail_new_listings(new_listings):
         server.quit()
 
         print("E-mail sent succesfully")
+
+        # Flag unflagged records
+        cursor.execute('''
+            UPDATE
+                LISTINGS
+            SET
+                FLAG = TRUE
+            WHERE
+                FLAG = FALSE;
+        ''')
+        conn.commit()
+
+        print("Flagged all unflagged records")
+
     except Exception as e:
         print(f"An error occurred in mail_new_listings: {e}")
         exit()
@@ -239,9 +257,11 @@ def main():
     insert_records_target(conn, cursor)
     new_listings = get_new_listings(conn, cursor)
     
+    # Only send an e-mail if there are new listings
     if len(new_listings) > 0:
-        mail_new_listings(new_listings)
+        mail_new_listings(new_listings, conn, cursor)
     else:
         print("No new listings to send")
+
 if __name__ == "__main__":
     main()
