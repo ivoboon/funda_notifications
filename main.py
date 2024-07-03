@@ -236,7 +236,8 @@ def mail_new_listings(new_listings, conn, cursor):
             UPDATE
                 LISTINGS
             SET
-                FLAG = TRUE
+                FLAG = TRUE,
+                UPDATE_TIMESTAMP = DATETIME()
             WHERE
                 FLAG = FALSE;
         ''')
